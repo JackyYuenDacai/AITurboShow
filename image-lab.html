@@ -1,0 +1,150 @@
+﻿<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="color-scheme" content="dark">
+  <title>AITurboShow - Image lab</title>
+  <link rel="stylesheet" href="/styles.css?v=20260905-1">
+  <link rel="stylesheet" href="/labs.css?v=20260905-1">
+</head>
+<body class="lab-page">
+  <div class="app-shell">
+    <header class="topbar">
+      <div class="brand-block">
+        <div class="brand-mark" aria-hidden="true"><span></span><span></span><span></span></div>
+        <div>
+          <div class="brand-name">AITurboShow</div>
+          <div class="brand-subtitle">Image generation lab</div>
+        </div>
+      </div>
+      <div class="topbar-actions">
+        <nav class="primary-tabs" aria-label="AITurboShow tools">
+          <a class="primary-tab" href="/">Studio</a>
+          <a class="primary-tab active" aria-current="page" href="/image-lab.html">Image lab</a>
+          <a class="primary-tab" href="/video-lab.html">Video lab</a>
+        </nav>
+        <button id="agentButton" class="agent-status setup" type="button" title="Configure the DeepSeek production-writing agent">
+          <span></span>
+          <div><b>DeepSeek</b><small>Setup</small></div>
+        </button>
+        <div id="comfyStatus" class="comfy-status" title="ComfyUI backend status">
+          <span></span>
+          <div><b>ComfyUI</b><small>Checking</small></div>
+        </div>
+        <button id="taskQueueButton" aria-controls="taskQueuePanel" aria-expanded="false" class="task-queue-button" type="button" title="Show generation tasks">
+          <span class="task-queue-icon">&#8594;</span>
+          <span>Tasks</span>
+          <b id="taskQueueCount">0</b>
+        </button>
+      </div>
+    </header>
+
+    <aside class="sidebar" aria-label="Lab guide">
+      <div class="sidebar-heading">
+        <span>Lab guide</span>
+      </div>
+      <div class="lab-guide">
+        <div class="eyebrow">Z-Image Turbo</div>
+        <p>Explore characters, environments, and objects in a dedicated creative workspace.</p>
+        <div class="lab-guide-step"><b>1</b><span>Describe the reference image you need.</span></div>
+        <div class="lab-guide-step"><b>2</b><span>Optionally rewrite the prompt with DeepSeek using AITurboShow image guidance.</span></div>
+        <div class="lab-guide-step"><b>3</b><span>Generate and preview the result. Completed runs stay in Saved runs.</span></div>
+      </div>
+      <div class="sidebar-footer">
+        <span class="keyboard-key">R</span>
+        <span>Refresh runs</span>
+      </div>
+    </aside>
+
+    <main class="workspace">
+      <div class="lab-view">
+        <section class="story-hero panel-surface">
+          <div class="eyebrow">Z-Image Turbo</div>
+          <div class="story-hero-main">
+            <div>
+              <h1>Image lab</h1>
+              <p>Turn an idea into a clean production reference image. DeepSeek rewrites the prompt using AITurboShow image guidance.</p>
+            </div>
+          </div>
+        </section>
+
+        <section class="lab-editor-section">
+          <div class="section-heading">
+            <div>
+              <div class="eyebrow">Prompt</div>
+              <h2>Image generation</h2>
+            </div>
+          </div>
+          <form id="labForm" class="panel-surface lab-card">
+            <div class="lab-prompt-heading"><label for="prompt">Describe your image</label><span id="promptCount" class="lab-hint"></span></div>
+            <textarea id="prompt" required rows="6" placeholder="A cinematic portrait of..."></textarea>
+            <label class="lab-field lab-instruction">Extra direction<input id="instruction" placeholder="Soft daylight, muted colors, a clean background…"></label>
+            <div class="lab-settings-heading"><span class="eyebrow">Generation settings</span><span id="settingsSummary" class="lab-hint"></span></div><label class="lab-field">Resolution preset<select id="sizePreset"><option value="1024x1024">Square · 1024 × 1024</option><option value="1344x768">Landscape · 1344 × 768</option><option value="768x1024">Portrait · 768 × 1024</option><option value="1536x1024">Wide · 1536 × 1024</option><option value="custom">Custom dimensions</option></select></label>
+            <div class="lab-row-grid">
+              <label class="lab-field">Width<input id="width" type="number" value="1024" step="16" min="256" max="2048" required></label>
+              <label class="lab-field">Height<input id="height" type="number" value="1024" step="16" min="256" max="2048" required></label>
+              <label class="lab-field">Steps<input id="steps" type="number" value="15" min="1" max="50" required></label>
+            </div>
+            <label class="lab-field">Seed <span class="lab-hint">Optional</span><input id="seed" type="number" min="0" max="9007199254740991" step="1" placeholder="Random each run"></label>
+            <div class="lab-actions">
+              <button id="rewrite" class="text-button agent-action-button" type="button">Rewrite with DeepSeek</button>
+              <button id="undoPrompt" class="text-button" type="button" disabled>Undo rewrite</button><button id="generate" class="generation-button primary" type="submit">Generate image</button>
+            </div>
+            <div id="status" class="lab-status" role="status" aria-live="polite"></div>
+          </form>
+        </section>
+
+        <section class="lab-output-section">
+          <div class="section-heading">
+            <div>
+              <div class="eyebrow">Preview</div>
+              <h2>Prompt draft</h2>
+            </div>
+          </div>
+          <div class="panel-surface lab-output"><div class="lab-prompt-heading"><label for="output">Review and refine</label><div class="lab-actions"><button id="copyPrompt" class="text-button" type="button" disabled>Copy</button><button id="usePrompt" class="text-button" type="button" disabled>Use draft</button></div></div>
+            <textarea id="output" placeholder="Your rewritten prompt will appear here."></textarea>
+          </div>
+        </section>
+      </div>
+    </main>
+
+    <aside class="inspector" aria-label="Saved runs">
+      <div class="inspector-header">
+        <div>
+          <div class="eyebrow">Lab history</div>
+          <h2>Saved runs</h2>
+        </div>
+        <div class="lab-actions"><span id="historyCount" class="count-pill">0</span><button id="refreshHistory" class="text-button" type="button" title="Refresh saved runs (R)">Refresh</button></div>
+      </div>
+      <div id="history" class="inspector-body lab-history"></div>
+    </aside>
+  </div>
+
+  <aside id="taskQueuePanel" class="task-queue-panel hidden" aria-label="Generation task progress">
+    <div class="task-queue-header">
+      <div>
+        <div class="eyebrow">Lab production</div>
+        <h2>Generation tasks</h2>
+      </div>
+      <button id="closeTaskQueue" class="icon-button small" type="button" aria-label="Close task queue">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m6 6 12 12M18 6 6 18"/></svg>
+      </button>
+    </div>
+    <div id="taskQueueSummary" class="task-queue-summary"></div>
+    <div id="taskQueueList" class="task-queue-list"></div>
+  </aside>
+
+  <div id="imageLightbox" class="image-lightbox hidden" role="dialog" aria-modal="true" aria-label="Full-size image preview">
+    <div class="image-lightbox-backdrop" data-image-close></div>
+    <div class="image-lightbox-content">
+      <button class="icon-button small image-lightbox-close" type="button" data-image-close aria-label="Close preview">X</button>
+      <img id="imageLightboxImage" alt="">
+      <div id="imageLightboxCaption" class="image-lightbox-caption"></div>
+    </div>
+  </div>
+
+  <script src="/lab.js?v=20260905-1" defer></script>
+</body>
+</html>
+

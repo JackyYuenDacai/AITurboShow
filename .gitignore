@@ -1,0 +1,17 @@
+# Local credentials and machine-specific configuration
+config.local.json
+.env
+.env.*
+!.env.example
+
+# Local runtime data (may contain prompts, references, or file metadata)
+lab-history.json
+lab-references.json
+server.stdout.log
+server.stderr.log
+
+# Common generated files
+node_modules/
+dist/
+coverage/
+*.log

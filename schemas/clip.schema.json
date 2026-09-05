@@ -1,0 +1,141 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://aiturboshow.local/schemas/clip.schema.json",
+  "title": "AITurboShow clip",
+  "description": "Authoritative metadata, Prompt, references, dependencies, and outputs for one generated or post-produced story clip.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "clip_id",
+    "sequence",
+    "title",
+    "path_base",
+    "generation_mode",
+    "duration_seconds",
+    "video_prompt",
+    "first_frame_image_prompt",
+    "post_production_instructions",
+    "references",
+    "outputs"
+  ],
+  "properties": {
+    "$schema": {
+      "type": "string"
+    },
+    "schema_version": {
+      "const": 1
+    },
+    "clip_id": {
+      "type": "string",
+      "pattern": "^clip-[0-9]{2,}$"
+    },
+    "sequence": {
+      "type": "integer",
+      "minimum": 1
+    },
+    "title": {
+      "type": "string",
+      "minLength": 1
+    },
+    "path_base": {
+      "enum": ["story", "episode", "repository"],
+      "description": "Base directory used to resolve all source and output paths in this clip record."
+    },
+    "generation_mode": {
+      "type": "string",
+      "minLength": 1
+    },
+    "duration_seconds": {
+      "type": "number",
+      "exclusiveMinimum": 0,
+      "maximum": 15
+    },
+    "video_prompt": {
+      "type": ["string", "null"],
+      "description": "The complete Prompt sent to the video generator. Null for post-production-only clips."
+    },
+    "first_frame_image_prompt": {
+      "type": ["string", "null"],
+      "description": "Optional image-generation Prompt used to create the first-frame input."
+    },
+    "post_production_instructions": {
+      "type": ["string", "null"]
+    },
+    "references": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/reference"
+      }
+    },
+    "outputs": {
+      "$ref": "#/$defs/outputs"
+    }
+  },
+  "$defs": {
+    "reference": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["picture", "id", "role", "description", "source"],
+      "properties": {
+        "picture": {
+          "type": ["integer", "null"],
+          "minimum": 1,
+          "description": "The H3 <Picture N> socket number. Null means a post-production input rather than an H3 picture socket."
+        },
+        "id": {
+          "type": "string",
+          "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$"
+        },
+        "role": {
+          "type": "string",
+          "minLength": 1
+        },
+        "description": {
+          "type": "string",
+          "minLength": 1
+        },
+        "source": {
+          "oneOf": [
+            { "$ref": "#/$defs/fileSource" },
+            { "$ref": "#/$defs/clipArtifactSource" }
+          ]
+        }
+      }
+    },
+    "fileSource": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["type", "path"],
+      "properties": {
+        "type": { "const": "file" },
+        "path": { "type": "string", "minLength": 1 },
+        "prompt_path": { "type": "string", "minLength": 1 }
+      }
+    },
+    "clipArtifactSource": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["type", "clip_id", "artifact"],
+      "properties": {
+        "type": { "const": "clip_artifact" },
+        "clip_id": { "type": "string", "pattern": "^clip-[0-9]{2,}$" },
+        "artifact": { "type": "string", "minLength": 1 }
+      }
+    },
+    "artifactOutput": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["path", "artifact_id"],
+      "properties": {
+        "path": { "type": "string", "minLength": 1 },
+        "artifact_id": { "type": "string", "minLength": 1 }
+      }
+    },
+    "outputs": {
+      "type": "object",
+      "minProperties": 1,
+      "additionalProperties": { "$ref": "#/$defs/artifactOutput" }
+    }
+  }
+}

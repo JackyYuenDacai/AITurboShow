@@ -1,0 +1,238 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="color-scheme" content="dark">
+  <title>AITurboShow</title>
+  <link rel="stylesheet" href="/styles.css?v=20260905-1">
+</head>
+<body>
+  <div class="app-shell">
+    <header class="topbar">
+      <div class="brand-block">
+        <div class="brand-mark" aria-hidden="true">
+          <span></span><span></span><span></span>
+        </div>
+        <div>
+          <div class="brand-name">AITurboShow</div>
+          <div class="brand-subtitle">Story production editor</div>
+        </div>
+      </div>
+
+      <div class="topbar-actions">
+        <nav class="primary-tabs" aria-label="AITurboShow tools">
+          <a class="primary-tab active" href="/">Studio</a>
+          <a class="primary-tab" href="/image-lab.html">Image lab</a>
+          <a class="primary-tab" href="/video-lab.html">Video lab</a>
+        </nav>
+        <button id="newStoryButton" class="text-button" type="button">+ Story</button>
+        <button id="agentButton" class="agent-status setup" type="button" title="Configure the DeepSeek production-writing agent">
+          <span></span>
+          <div>
+            <b>DeepSeek</b>
+            <small>Setup</small>
+          </div>
+        </button>
+        <div id="comfyStatus" class="comfy-status" title="ComfyUI backend status">
+          <span></span>
+          <div>
+            <b>ComfyUI</b>
+            <small>Checking</small>
+          </div>
+        </div>
+        <button id="taskQueueButton" class="task-queue-button" type="button" title="Show generation tasks">
+          <span class="task-queue-icon">↻</span>
+          <span>Tasks</span>
+          <b id="taskQueueCount">0</b>
+        </button>
+        <label class="search-box">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m21 21-4.35-4.35m2.35-5.15A7.5 7.5 0 1 1 4 11.5a7.5 7.5 0 0 1 15 0Z"/></svg>
+          <input id="searchInput" type="search" placeholder="Find a clip or reference…" autocomplete="off">
+        </label>
+        <button id="refreshButton" class="icon-button" type="button" title="Rescan repository" aria-label="Rescan repository">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M20 6v5h-5M4 18v-5h5m10.2-2A8 8 0 0 0 5.3 7.6L4 11m16 2-1.3 3.4A8 8 0 0 1 4.8 14"/></svg>
+        </button>
+        <div id="scanStatus" class="scan-status"><span></span>Scanning</div>
+      </div>
+    </header>
+
+    <aside class="sidebar" aria-label="Story structure">
+      <div class="sidebar-heading">
+        <span>Production store</span>
+        <span id="storyCount" class="count-pill">0</span>
+      </div>
+      <div class="tree-tools"><button id="revealProduction" class="text-button" type="button">Show current</button><button id="collapseProductions" class="text-button" type="button">Collapse all</button></div>
+      <nav id="storyTree" class="story-tree" aria-label="Productions and episodes"></nav>
+      <div class="sidebar-footer">
+        <span class="keyboard-key">R</span>
+        <span>Refresh filesystem</span>
+      </div>
+    </aside>
+
+    <main class="workspace">
+      <div id="emptyState" class="empty-state hidden">
+        <div class="empty-orbit"><span></span></div>
+        <h1>No story projects found</h1>
+        <p>Use + Story to create a production, or add an existing outline under the repository root.</p>
+      </div>
+
+      <div id="storyView" class="story-view hidden">
+        <section class="story-hero panel-surface">
+          <div class="eyebrow">Story overview</div>
+          <div class="story-hero-main">
+            <div>
+              <h1 id="storyTitle"></h1>
+              <p id="storySummary"></p>
+            </div>
+            <div class="story-hero-actions">
+              <button id="editStoryButton" class="text-button" type="button">Edit story</button>
+              <div id="storyStats" class="story-stats"></div>
+            </div>
+          </div>
+          <div class="story-path-row">
+            <span class="path-label">ROOT</span>
+            <code id="storyPath"></code>
+          </div>
+        </section>
+
+        <section class="reference-section">
+          <div class="section-heading">
+            <div>
+              <div class="eyebrow">Persistent across episodes</div>
+              <h2>Story reference library</h2>
+            </div>
+            <div class="section-actions">
+              <div id="referenceSummary" class="section-meta"></div>
+              <button id="newReferenceButton" class="text-button" type="button">+ Reference</button>
+            </div>
+          </div>
+          <div id="storyReferences" class="reference-strip"></div>
+        </section>
+
+        <section class="episode-section">
+          <div class="section-heading episode-heading">
+            <div>
+              <div class="eyebrow">Episode layer</div>
+              <h2 id="episodeTitle"></h2>
+            </div>
+            <div class="episode-controls">
+              <div id="episodeTabs" class="episode-tabs"></div>
+              <button id="editEpisodeButton" class="text-button" type="button">Edit episode</button>
+              <button id="newEpisodeButton" class="text-button" type="button">+ Episode</button>
+              <button id="newClipButton" class="text-button" type="button">+ Clip</button>
+              <button id="aiClipsButton" class="text-button agent-action-button" type="button">AI Clips</button>
+              <button id="rewritePromptsButton" class="text-button agent-action-button" type="button">Rewrite prompts</button>
+              <button id="regenerateChainButton" class="text-button queue-action-button" type="button">Regenerate chain</button>
+              <button id="queueEpisodeButton" class="text-button queue-action-button" type="button">Queue H3</button>
+              <button id="batchReferenceButton" class="text-button queue-action-button" type="button">Batch images</button>
+              <button id="fitGraphButton" class="text-button" type="button">Start of flow</button>
+            </div>
+          </div>
+
+          <div id="episodeSummary" class="episode-summary"></div>
+
+          <div id="episodePreview" class="episode-preview panel-surface"></div>
+
+          <div id="episodeReferenceLibrary" class="episode-reference-library hidden">
+            <div class="subsection-heading">
+              <div>
+                <div class="eyebrow">Current episode only</div>
+                <h3>Episode reference library</h3>
+              </div>
+              <div id="episodeReferenceSummary" class="section-meta"></div>
+            </div>
+            <div id="episodeReferences" class="reference-strip"></div>
+          </div>
+
+          <div class="graph-frame panel-surface">
+            <div class="graph-toolbar">
+              <div class="legend">
+                <span><i class="legend-dot ready"></i>Ready</span>
+                <span><i class="legend-dot dependency"></i>Previous frame pending</span>
+                <span><i class="legend-dot partial"></i>Missing assets</span>
+                <span><i class="legend-dot post"></i>Post-production</span>
+              </div>
+              <div id="graphMeta" class="graph-meta"></div>
+            </div>
+            <div id="clipViewport" class="clip-viewport">
+              <div id="clipFlow" class="clip-flow"></div>
+            </div>
+          </div>
+        </section>
+      </div>
+    </main>
+
+    <aside id="inspector" class="inspector" aria-label="Clip inspector">
+      <div id="inspectorEmpty" class="inspector-empty">
+        <div class="inspector-icon">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 5h16v14H4zM8 9h8M8 13h5"/></svg>
+        </div>
+        <h2>Select a node</h2>
+        <p>Choose a clip or a story reference to inspect its Prompt, images, and source relationships.</p>
+      </div>
+
+      <div id="inspectorContent" class="inspector-content hidden">
+        <div class="inspector-header">
+          <div>
+            <div id="inspectorEyebrow" class="eyebrow"></div>
+            <h2 id="inspectorTitle"></h2>
+          </div>
+          <button id="closeInspector" class="icon-button small" type="button" aria-label="Close inspector">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m6 6 12 12M18 6 6 18"/></svg>
+          </button>
+        </div>
+        <div id="inspectorBadges" class="inspector-badges"></div>
+        <div id="inspectorTabs" class="inspector-tabs"></div>
+        <div id="inspectorBody" class="inspector-body"></div>
+      </div>
+    </aside>
+  </div>
+
+  <aside id="taskQueuePanel" class="task-queue-panel hidden" aria-label="Generation task progress">
+    <div class="task-queue-header">
+      <div>
+        <div class="eyebrow">ComfyUI production</div>
+        <h2>Generation tasks</h2>
+      </div>
+      <button id="closeTaskQueue" class="icon-button small" type="button" aria-label="Close task queue">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m6 6 12 12M18 6 6 18"/></svg>
+      </button>
+    </div>
+    <div id="taskQueueSummary" class="task-queue-summary"></div>
+    <div id="taskQueueList" class="task-queue-list"></div>
+  </aside>
+
+  <div id="toast" class="toast" role="status"></div>
+
+  <div id="imageLightbox" class="image-lightbox hidden" role="dialog" aria-modal="true" aria-label="Full-size image preview">
+    <div class="image-lightbox-backdrop" data-image-close></div>
+    <div class="image-lightbox-content">
+      <button class="icon-button small image-lightbox-close" type="button" data-image-close aria-label="Close image preview">×</button>
+      <img id="imageLightboxImage" src="" alt="">
+      <div id="imageLightboxCaption" class="image-lightbox-caption"></div>
+    </div>
+  </div>
+
+  <div id="editorModal" class="editor-modal hidden" role="dialog" aria-modal="true" aria-labelledby="editorModalTitle">
+    <div class="editor-backdrop" data-editor-close></div>
+    <form id="editorForm" class="editor-dialog">
+      <div class="editor-header">
+        <div>
+          <div class="eyebrow">Production editor</div>
+          <h2 id="editorModalTitle">Edit</h2>
+        </div>
+        <button class="icon-button small" type="button" data-editor-close aria-label="Close editor">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m6 6 12 12M18 6 6 18"/></svg>
+        </button>
+      </div>
+      <div id="editorBody" class="editor-body"></div>
+      <div class="editor-footer">
+        <button class="text-button" type="button" data-editor-close>Cancel</button>
+        <button id="editorSubmitButton" class="generation-button primary" type="submit">Save</button>
+      </div>
+    </form>
+  </div>
+  <script src="/app.js?v=20260905-1" defer></script>
+</body>
+</html>
