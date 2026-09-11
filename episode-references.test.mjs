@@ -1,14 +1,13 @@
-import test from "node:test";
+﻿import test from "node:test";
 import assert from "node:assert/strict";
-import vm from "node:vm";
 import * as fs from "node:fs";
 import * as path from "node:path";
-import * as crypto from "node:crypto";
-import { createServer } from "node:http";
 import { tmpdir } from "node:os";
-import { fileURLToPath } from "node:url";
+import { env } from "./lib/state.mjs";
+import { buildCatalog } from "./lib/catalog.mjs";
+import { manualClipReferences, updateReferenceContent } from "./lib/content.mjs";
+import { walk } from "./lib/fs-utils.mjs";
 
-const toolDirectory = path.dirname(fileURLToPath(import.meta.url));
 function fixture() {
   const root = fs.mkdtempSync(path.join(tmpdir(), "aiturboshow-references-"));
   const story = path.join(root, "story");
@@ -51,14 +50,13 @@ function fixture() {
     clip.references.forEach((entry, index) => { entry.picture = index + 1; });
     write(`episode-01/${clip.clip_id}.json`, JSON.stringify(clip));
   }
-  let source = fs.readFileSync(path.join(toolDirectory, "server.mjs"), "utf8")
-    .replace(/^import .*;\r?\n/gm, "")
-    .replace('const toolDirectory = dirname(fileURLToPath(import.meta.url));', `const toolDirectory = ${JSON.stringify(toolDirectory)};`)
-    .replace('const repositoryRoot = resolve(toolDirectory, "..");', `const repositoryRoot = ${JSON.stringify(root)};`);
-  source = source.slice(0, source.indexOf("const args = process.argv.slice(2);"));
-  const context = vm.createContext({ ...fs, ...path, ...crypto, createServer, Buffer, process: { env: {} }, console });
-  vm.runInContext(source + '\nglobalThis.api = {buildCatalog, manualClipReferences, updateReferenceContent, walk};', context);
-  return { root, story, episode, api: context.api, close: () => fs.rmSync(root, { recursive: true, force: true }) };
+  const previousRepositoryRoot = env.repositoryRoot;
+  env.repositoryRoot = root;
+  return {
+    root, story, episode,
+    api: { buildCatalog, manualClipReferences, updateReferenceContent, walk },
+    close: () => { env.repositoryRoot = previousRepositoryRoot; fs.rmSync(root, { recursive: true, force: true }); },
+  };
 }
 
 test("episode discovery merges clip file inputs, deduplicates paths, and preserves dependencies", () => {

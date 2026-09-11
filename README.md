@@ -401,7 +401,20 @@ Do not replace a previous-frame dependency with a guessed PNG path. `source.type
 
 ```text
 AITurboShow/
-├── server.mjs         filesystem scanner, editor API, and ComfyUI backend
+├── server.mjs         entry point: CLI flags, backend wiring, and startup
+├── lib/               modular server implementation
+│   ├── state.mjs      mutable environment, runtime state, and swappable backends
+│   ├── constants.mjs  shared literals, patterns, and model/node requirements
+│   ├── fs-utils.mjs   filesystem and safe-path helpers
+│   ├── files.mjs      atomic image/text/JSON writers and MIME detection
+│   ├── http.mjs       request/response helpers and API-token checks
+│   ├── catalog.mjs    story/episode/clip/reference discovery
+│   ├── comfy.mjs      ComfyUI client and H3 / Z-Image prompt builders
+│   ├── generation.mjs job queue, monitoring, and finalization
+│   ├── content.mjs    story/episode/clip/reference content API
+│   ├── agent.mjs      DeepSeek production-writing agent
+│   ├── lab.mjs        standalone image/video generation labs
+│   └── server.mjs     HTTP routing for all /api endpoints
 ├── schemas/           structured clip JSON Schema
 ├── validate-clips.mjs generic structured-clip validator
 ├── index.html         application shell

@@ -1,50 +1,44 @@
-import test from "node:test";
+﻿import test from "node:test";
 import assert from "node:assert/strict";
-import vm from "node:vm";
 import * as fs from "node:fs";
 import * as path from "node:path";
-import * as crypto from "node:crypto";
-import { createServer } from "node:http";
+import { tmpdir } from "node:os";
 import { fileURLToPath } from "node:url";
+import { backends, env, runtime } from "./lib/state.mjs";
+import { createApplicationServer } from "./lib/server.mjs";
 
 // Run the real API handlers with isolated history, reference storage, and ComfyUI.
 // No production files, API keys, or generation services are changed by these tests.
 const directory = path.dirname(fileURLToPath(import.meta.url));
-const fixture = path.resolve(directory, "..", "__lab-test.png");
-let source = fs.readFileSync(path.join(directory, "server.mjs"), "utf8")
-  .replace(/^import .*;\r?\n/gm, "")
-  .replace('const toolDirectory = dirname(fileURLToPath(import.meta.url));', `const toolDirectory = ${JSON.stringify(directory)};`);
-source = source.slice(0, source.indexOf("const args = process.argv.slice(2);"));
 
 async function harness() {
+  const sandbox = fs.mkdtempSync(path.join(tmpdir(), "aiturboshow-lab-"));
+  const fixture = path.join(sandbox, "__lab-test.png");
+  fs.writeFileSync(fixture, Buffer.from("image-data"));
+  const previousRepositoryRoot = env.repositoryRoot;
+  const previousToken = runtime.apiToken;
+  env.repositoryRoot = sandbox;
+  runtime.apiToken = "";
+
   const state = { history: [], references: [], calls: [], records: {}, queue: { queue_running: [], queue_pending: [] }, drafts: [] };
-  const context = vm.createContext({
-    ...fs, ...path, ...crypto, createServer, fileURLToPath, Buffer, Blob, FormData, URL, URLSearchParams,
-    AbortController, setTimeout, clearTimeout, process: { env: {} }, console: { log() {}, error() {} },
-    statSync: (name) => path.resolve(name) === fixture ? { isFile: () => true, size: 10 } : fs.statSync(name),
-    readFileSync: (name, encoding) => path.resolve(name) === fixture ? Buffer.from("image-data") : fs.readFileSync(name, encoding),
-    state,
-    mockComfy: async (url, options) => {
-      state.calls.push({ url, options });
-      if (url === "/upload/image") return { name: "staged.png", subfolder: "aiturboshow-lab" };
-      if (url === "/prompt") return { prompt_id: `prompt-${state.calls.length}` };
-      if (url === "/history") return state.records;
-      if (url === "/queue") return state.queue;
-      throw new Error(`Unexpected backend call: ${url}`);
-    },
-  });
-  vm.runInContext(source + `
-    readLabHistory = () => JSON.parse(JSON.stringify(state.history));
-    saveLabHistory = (items) => { state.history = JSON.parse(JSON.stringify(items)); };
-    readLabReferences = () => JSON.parse(JSON.stringify(state.references));
-    saveLabReferences = (items) => { state.references = JSON.parse(JSON.stringify(items)); };
-    comfyRequest = mockComfy;
-    comfyBinaryRequest = async () => Buffer.from("output");
-    generateAgentContent = async (payload) => { state.drafts.push(payload); return {content: "Draft", model: "test-model"}; };
-    globalThis.application = createApplicationServer();
-  `, context);
-  await new Promise((resolve) => context.application.listen(0, "127.0.0.1", resolve));
-  const base = `http://127.0.0.1:${context.application.address().port}`;
+  backends.comfyRequest = async (url, options) => {
+    state.calls.push({ url, options });
+    if (url === "/upload/image") return { name: "staged.png", subfolder: "aiturboshow-lab" };
+    if (url === "/prompt") return { prompt_id: `prompt-${state.calls.length}` };
+    if (url === "/history") return state.records;
+    if (url === "/queue") return state.queue;
+    throw new Error(`Unexpected backend call: ${url}`);
+  };
+  backends.comfyBinaryRequest = async () => Buffer.from("output");
+  backends.generateAgentContent = async (payload) => { state.drafts.push(payload); return { content: "Draft", model: "test-model" }; };
+  backends.readLabHistory = () => JSON.parse(JSON.stringify(state.history));
+  backends.saveLabHistory = (items) => { state.history = JSON.parse(JSON.stringify(items)); };
+  backends.readLabReferences = () => JSON.parse(JSON.stringify(state.references));
+  backends.saveLabReferences = (items) => { state.references = JSON.parse(JSON.stringify(items)); };
+
+  const application = createApplicationServer();
+  await new Promise((resolve) => application.listen(0, "127.0.0.1", resolve));
+  const base = `http://127.0.0.1:${application.address().port}`;
   return {
     state,
     async call(endpoint, body, method = "POST") {
@@ -52,7 +46,12 @@ async function harness() {
       const data = response.headers.get("content-type")?.includes("application/json") ? await response.json() : await response.text();
       return { status: response.status, data, type: response.headers.get("content-type") };
     },
-    async close() { await new Promise((resolve) => context.application.close(resolve)); },
+    async close() {
+      await new Promise((resolve) => application.close(resolve));
+      env.repositoryRoot = previousRepositoryRoot;
+      runtime.apiToken = previousToken;
+      fs.rmSync(sandbox, { recursive: true, force: true });
+    },
   };
 }
 
