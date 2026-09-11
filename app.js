@@ -2037,6 +2037,15 @@ function renderGenerationPanel(clip) {
             ${h3ResolutionOptions("864x480")}
           </select>
         </label>
+        <label class="generation-option"><span>Sol-H3 acceleration</span><input type="checkbox" data-sol-h3 ${active ? "disabled" : ""}></label>
+        <div class="generation-sol-settings" data-sol-settings hidden>
+          <label class="generation-option"><span>SOL tau</span><input type="number" data-sol-tau min="0.1" max="4" step="0.1" value="1.3"></label>
+          <label class="generation-option"><span>Min tokens</span><input type="number" data-sol-min-tokens min="256" step="256" value="12288"></label>
+          <label class="generation-option"><span>Start / end</span><span><input type="number" data-sol-start min="0" max="1" step="0.05" value="0.2"> – <input type="number" data-sol-end min="0" max="1" step="0.05" value="0.9"></span></label>
+          <label class="generation-option"><span>Sink conditioning</span><select data-sol-sink><option value="exact_kv">Exact KV</option><option value="exact_kv_and_rows">Exact KV + rows</option><option value="off">Off</option></select></label>
+          <label class="generation-option"><span>Morton ordering</span><input type="checkbox" data-sol-morton></label>
+          <label class="generation-option"><span>Reuse QKV memory</span><input type="checkbox" data-sol-reuse></label>
+        </div>
         <div class="generation-actions">
           <button class="generation-button" type="button" data-comfy-action="validate" ${backendReady && supported ? "" : "disabled"}>Validate</button>
           <button class="generation-button primary" type="button" data-comfy-action="queue" ${canQueue ? "" : "disabled"}>${active ? "Queued" : clip.complete ? "Regenerate H3" : "Queue H3"}</button>
@@ -2358,6 +2367,12 @@ dom.inspectorTabs.addEventListener("click", (event) => {
   saveNavigation();
 });
 
+dom.inspectorBody.addEventListener("change", (event) => {
+  if (event.target.matches("[data-sol-h3]")) {
+    const settings = dom.inspectorBody.querySelector("[data-sol-settings]");
+    if (settings) settings.hidden = !event.target.checked;
+  }
+});
 dom.inspectorBody.addEventListener("click", async (event) => {
   const referenceClip = event.target.closest("[data-reference-clip]");
   if (referenceClip) {
@@ -2446,7 +2461,18 @@ dom.inspectorBody.addEventListener("click", async (event) => {
         if (force && !window.confirm("All declared outputs already exist. Regenerate this clip and replace them after ComfyUI completes?")) return;
         const size = dom.inspectorBody.querySelector("[data-h3-resolution]")?.value || "864x480";
         const [width, height] = size.split("x").map(Number);
-        const result = await postJson("/api/comfy/generate", { ...payload, force, options: { width, height } });
+        const sol = dom.inspectorBody.querySelector("[data-sol-h3]");
+        const options = { width, height, use_sol_h3: Boolean(sol?.checked) };
+        if (options.use_sol_h3) Object.assign(options, {
+          sol_tau: Number(dom.inspectorBody.querySelector("[data-sol-tau]")?.value || 1.3),
+          sol_min_tokens: Number(dom.inspectorBody.querySelector("[data-sol-min-tokens]")?.value || 12288),
+          sol_start_percent: Number(dom.inspectorBody.querySelector("[data-sol-start]")?.value || 0.2),
+          sol_end_percent: Number(dom.inspectorBody.querySelector("[data-sol-end]")?.value || 0.9),
+          sol_sink_conditioning: dom.inspectorBody.querySelector("[data-sol-sink]")?.value || "exact_kv",
+          sol_morton: Boolean(dom.inspectorBody.querySelector("[data-sol-morton]")?.checked),
+          sol_reuse_qkv_memory: Boolean(dom.inspectorBody.querySelector("[data-sol-reuse]")?.checked),
+        });
+        const result = await postJson("/api/comfy/generate", { ...payload, force, options });
         const dependencyCount = Number(result.automatic_dependency_count || 0);
         const dependencyMessage = dependencyCount
           ? ` ${dependencyCount} prerequisite clip${dependencyCount === 1 ? " was" : "s were"} added first.`

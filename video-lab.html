@@ -98,6 +98,18 @@
               <label class="lab-field">Steps<input id="steps" type="number" value="20" min="1" max="100" required></label>
             </div>
             <label class="lab-field">Seed <span class="lab-hint">Optional</span><input id="seed" type="number" min="0" max="9007199254740991" step="1" placeholder="Random each run"></label>
+            <fieldset class="lab-sol-settings"><legend>Sol-H3 acceleration</legend>
+              <label class="lab-field"><span>Use Sol-H3</span><input id="useSolH3" type="checkbox"></label>
+              <div id="solSettings" class="lab-row-grid" hidden>
+                <label class="lab-field">Tau<input id="solTau" type="number" value="1.3" min="0.1" max="4" step="0.1"></label>
+                <label class="lab-field">Minimum tokens<input id="solMinTokens" type="number" value="12288" min="256" step="256"></label>
+                <label class="lab-field">Start percent<input id="solStart" type="number" value="0.2" min="0" max="1" step="0.05"></label>
+                <label class="lab-field">End percent<input id="solEnd" type="number" value="0.9" min="0" max="1" step="0.05"></label>
+                <label class="lab-field">Sink conditioning<select id="solSink"><option value="exact_kv">Exact KV</option><option value="exact_kv_and_rows">Exact KV + rows</option><option value="off">Off</option></select></label>
+                <label class="lab-field">Morton ordering<input id="solMorton" type="checkbox"></label>
+                <label class="lab-field">Reuse QKV memory<input id="solReuse" type="checkbox"></label>
+              </div>
+            </fieldset>
             <div class="lab-actions">
               <button id="rewrite" class="text-button agent-action-button" type="button">Rewrite with DeepSeek</button>
               <button id="undoPrompt" class="text-button" type="button" disabled>Undo rewrite</button><button id="generate" class="generation-button primary" type="submit">Queue video</button>

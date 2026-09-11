@@ -2,7 +2,7 @@ const $ = (id) => document.getElementById(id);
 const isVideo = location.pathname.includes("video-lab");
 const kind = isVideo ? "video" : "image";
 const draftKey = `aiturboshow.lab.${kind}.v2`;
-const fieldIds = ["prompt", "instruction", "width", "height", "steps", "seed", ...(isVideo ? ["mode", "duration"] : [])];
+const fieldIds = ["prompt", "instruction", "width", "height", "steps", "seed", ...(isVideo ? ["mode", "duration", "useSolH3", "solTau", "solMinTokens", "solStart", "solEnd", "solSink", "solMorton", "solReuse"] : [])];
 let references = [];
 let selectedIds = new Set();
 let history = [];
@@ -89,6 +89,7 @@ async function loadReferences() {
 }
 if (isVideo) {
   $("mode").addEventListener("change", renderReferences);
+  $("useSolH3").addEventListener("change", () => { $("solSettings").hidden = !$("useSolH3").checked; saveDraft(); });
   $("referenceList").addEventListener("change", (event) => {
     const id = event.target.dataset.selectRef;
     if (!id) return;
@@ -137,6 +138,14 @@ $("labForm").addEventListener("submit", async (event) => {
     const refs = validate();
     const options = Object.fromEntries(["width", "height", "steps"].map((id) => [id, Number($(id).value)]));
     if ($("seed").value !== "") options.seed = Number($("seed").value);
+    if (isVideo) {
+      options.use_sol_h3 = $("useSolH3").checked;
+      if (options.use_sol_h3) Object.assign(options, {
+        sol_tau: Number($("solTau").value), sol_min_tokens: Number($("solMinTokens").value),
+        sol_start_percent: Number($("solStart").value), sol_end_percent: Number($("solEnd").value),
+        sol_sink_conditioning: $("solSink").value, sol_morton: $("solMorton").checked, sol_reuse_qkv_memory: $("solReuse").checked,
+      });
+    }
     setBusy(true); status("Sending to ComfyUI…"); saveDraft();
     const body = isVideo ? { video_mode: $("mode").value, video_prompt: $("prompt").value.trim(), duration: Number($("duration").value), references: refs, options } : { prompt: $("prompt").value.trim(), ...options };
     const data = await request(`/api/lab/generate-${kind}`, body);

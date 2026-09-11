@@ -150,7 +150,7 @@ function labNumber(value, fallback, min, max, name, step = 1) {
 }
 
 function labOptions(payload, video = false) {
-  return {
+  const result = {
     width: labNumber(payload.width, video ? 864 : 1024, 256, 2048, "Width", video ? 32 : 16),
     height: labNumber(payload.height, video ? 480 : 1024, 256, 2048, "Height", video ? 32 : 16),
     steps: labNumber(payload.steps, video ? 20 : 15, 1, video ? 100 : 50, "Steps"),
@@ -1161,6 +1161,23 @@ function h3VideoSize(options = {}) {
   };
 }
 
+function h3SolOptions(options = {}) {
+  return {
+    use_sol_h3: options.use_sol_h3 === true,
+    sol_tau: Number.isFinite(Number(options.sol_tau)) ? Math.max(0.1, Math.min(4, Number(options.sol_tau))) : 1.3,
+    sol_start_percent: Number.isFinite(Number(options.sol_start_percent)) ? Math.max(0, Math.min(1, Number(options.sol_start_percent))) : 0.2,
+    sol_end_percent: Number.isFinite(Number(options.sol_end_percent)) ? Math.max(0, Math.min(1, Number(options.sol_end_percent))) : 0.9,
+    sol_min_tokens: Number.isFinite(Number(options.sol_min_tokens)) ? Math.max(256, Math.min(262144, Math.round(Number(options.sol_min_tokens) / 256) * 256)) : 12288,
+    sol_sink_conditioning: ["exact_kv", "exact_kv_and_rows", "off"].includes(options.sol_sink_conditioning) ? options.sol_sink_conditioning : "exact_kv",
+    sol_morton: options.sol_morton === true,
+    sol_centroid_tail: options.sol_centroid_tail !== false,
+    sol_routed_cap_percent: Number.isFinite(Number(options.sol_routed_cap_percent)) ? Math.max(0, Math.min(100, Math.round(Number(options.sol_routed_cap_percent) / 5) * 5)) : 0,
+    sol_reuse_qkv_memory: options.sol_reuse_qkv_memory === true,
+    sol_dense_blocks: String(options.sol_dense_blocks || "").slice(0, 200),
+  };
+  return video ? { ...result, ...h3SolOptions(payload) } : result;
+}
+
 function h3RequiresFirstFrameContinuity(references = [], generationMode = "ref2va") {
   const pictureOne = Array.isArray(references)
     ? references.find((reference) => Number(reference?.picture) === 1)
@@ -1215,10 +1232,22 @@ function buildH3R2VPrompt(job, options = {}) {
   const steps = Math.max(1, Math.min(100, Number(options.steps || 20)));
   const scheduler = ["simple", "beta", "normal"].includes(options.scheduler) ? options.scheduler : "simple";
   const refImageSize = options.ref_image_size === "max" ? "max" : "match";
+  const sol = h3SolOptions(options);
   const prompt = {
     "1": { class_type: "VAELoader", inputs: { vae_name: "minimax_h3_video_vae_fp16.safetensors" } },
     "2": { class_type: "VAELoader", inputs: { vae_name: "minimax_h3_audio_vae_fp32.safetensors" } },
-    "3": { class_type: "UNETLoader", inputs: { unet_name: "minimax_h3_ref2va_pruned_int8_convrot.safetensors", weight_dtype: "default" } },
+    "3": sol.use_sol_h3
+      ? { class_type: "BSAI_SolH3_Loader", inputs: {
+          model_name: "minimax_h3_ref2va_pruned_int8_convrot.safetensors", precision: "default", sol_attn: true,
+          tau_start: 0.5, tau_end: 1.0, sink_conditioning: sol.sol_sink_conditioning, int8_qk: true,
+          fused_modulation: true, chunk_ff: true, chunk_size: 2, fast_h3_steps: "50步 原生高质量", sampler: "euler",
+          cfg: 4.0, shift: 8.0, audio_shift: 3.0, min_tokens: sol.sol_min_tokens, sol_tau: sol.sol_tau,
+          start_percent: sol.sol_start_percent, end_percent: sol.sol_end_percent, morton: sol.sol_morton,
+          morton_curve: "2d_frame", centroid_tail: sol.sol_centroid_tail, routed_cap_percent: sol.sol_routed_cap_percent,
+          reuse_qkv_memory: sol.sol_reuse_qkv_memory, verbose: false, dense_blocks: sol.sol_dense_blocks,
+          tau_profile: "", lora_name: "FastH3-4step-LoRA.safetensors", lora_strength: 0,
+        } }
+      : { class_type: "UNETLoader", inputs: { unet_name: "minimax_h3_ref2va_pruned_int8_convrot.safetensors", weight_dtype: "default" } },
     "4": { class_type: "CLIPLoader", inputs: { clip_name: "qwen3vl_32b_minimax_h3_nvfp4_awq.safetensors", type: "minimax", device: "default" } },
     "5": { class_type: "RandomNoise", inputs: { noise_seed: seed } },
     "6": {
@@ -1260,7 +1289,7 @@ function buildH3R2VPrompt(job, options = {}) {
     prompt[id] = { class_type: "LoadImage", inputs: { image: reference.image } };
     prompt["6"].inputs[`ref_images.ref_image_${reference.picture - 1}`] = [id, 0];
   }
-  return { prompt, seed, width, height, steps, scheduler, ref_image_size: refImageSize };
+  return { prompt, seed, width, height, steps, scheduler, ref_image_size: refImageSize, ...sol };
 }
 
 function publicGenerationJob(job) {
@@ -1635,6 +1664,7 @@ async function comfyStatus() {
         return !Array.isArray(choices) || !choices.includes(filename);
       })
       .map(([, , filename]) => filename);
+    const solH3MissingNodes = objectInfo.BSAI_SolH3_Loader ? [] : ["BSAI_SolH3_Loader"];
     return {
       connected: true,
       compatible: missingNodes.length === 0 && missingModels.length === 0,
@@ -1652,6 +1682,7 @@ async function comfyStatus() {
           missing_nodes: missingZImageNodes,
           missing_models: missingZImageModels,
         },
+        sol_h3: { compatible: solH3MissingNodes.length === 0, missing_nodes: solH3MissingNodes, missing_models: [] },
       },
       running: (queue.queue_running || []).length,
       pending: (queue.queue_pending || []).length,
@@ -1674,6 +1705,7 @@ async function comfyStatus() {
           missing_nodes: zImageRequiredNodes,
           missing_models: zImageRequiredModels.map(([, , filename]) => filename),
         },
+        sol_h3: { compatible: false, missing_nodes: ["BSAI_SolH3_Loader"], missing_models: [] },
       },
       running: 0,
       pending: 0,
@@ -3318,6 +3350,12 @@ function createApplicationServer() {
         }
         const payload = await readJsonRequest(request);
         const target = resolveCatalogClip(payload);
+        if (payload.options?.use_sol_h3 === true) {
+          const status = await comfyStatus();
+          const capability = status.capabilities?.sol_h3;
+          if (!status.connected) throw httpError(status.error || "ComfyUI is offline.", 502);
+          if (!capability?.compatible) throw httpError("Sol-H3 is not installed in ComfyUI. Install BSAI-ComfyUI-Sol-H3 and restart ComfyUI.", 400);
+        }
         const result = enqueueVideoGenerationWithDependencies(target, payload);
         const automaticDependencies = [...new Map(result.dependency_jobs.map((job) => [job.id, job])).values()];
         sendJson(response, {
